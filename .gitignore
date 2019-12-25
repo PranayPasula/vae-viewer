@@ -1,3 +1,3 @@
 images
 keras_vae.py
-vae*
+*.h5
