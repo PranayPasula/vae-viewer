@@ -157,7 +157,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     data = load_data(os.path.join(os.getcwd(), args.path))
-    vae, encoder, decoder, input, output, z_mean, z_logvar = build_vae(data, fc_sizes=[])
+    vae, encoder, decoder, input, output, z_mean, z_logvar = build_vae(data, fc_sizes=[256])
 
     # VAE loss = mse_loss or xent_loss + kl_loss
     if args.mse:
@@ -194,7 +194,7 @@ if __name__ == '__main__':
         offset_recons = []
         for offset in offsets:
             temp[0, latent_num] = z_mean[0, latent_num] + offset
-            recons_from_offsets.append(decoder.predict(temp)[0] * 255.0)
+            offset_recons.append(decoder.predict(temp)[0] * 255.0)
             temp = z_mean
-        offset_recons_cat = np.hstack(latent_w_offsets)
-        cv2.imwrite('mse_latent_{}.png'.format(latent_num), latent_all_offsets)
+        offset_recons_cat = np.hstack(offset_recons)
+        cv2.imwrite('mse_latent_{}.png'.format(latent_num), offset_recons_cat)

@@ -146,10 +146,18 @@ if __name__ == '__main__':
     parser.add_argument("-w", "--weights", help=help_)
     help_ = "Use mse loss instead of binary cross entropy (default)"
     parser.add_argument("-m", "--mse", help=help_, action='store_true')
+    parser.add_argument("-e", "--epochs", default=5, type=int)
+    parser.add_argument("-bs", "--batch_size", default=32, type=int)
+    help_ = "Path to images. All must have same format and same dimensions."
+    parser.add_argument("-p", "--path", help=help_)
+    help_ = "Save h5 model trained weights with --save <filename>"
+    parser.add_argument("-s", "--save", help=help_)
+    help_ = "Value of beta in beta-VAE"
+    parser.add_argument("-b", "--beta", help=help_, default=0, type=float)
     args = parser.parse_args()
 
-    data = load_data(os.path.join(os.getcwd(), 'images'))
-    vae, encoder, decoder, input, output, z_mean, z_logvar = build_vae(data, fc_sizes=[])
+    data = load_data(os.path.join(os.getcwd(), args.path))
+    vae, encoder, decoder, input, output, z_mean, z_logvar = build_vae(data, fc_sizes=[256])
 
     # VAE loss = mse_loss or xent_loss + kl_loss
     if args.mse:
@@ -163,7 +171,7 @@ if __name__ == '__main__':
     kl_loss = 1 + z_logvar - K.square(z_mean) - K.exp(z_logvar)
     kl_loss = K.sum(kl_loss, axis=-1)
     kl_loss *= -0.5
-    vae_loss = K.mean(reconstruction_loss + kl_loss)
+    vae_loss = K.mean(reconstruction_loss + args.beta * kl_loss)
     vae.add_loss(vae_loss)
     vae.compile(optimizer='rmsprop')
     vae.summary()
@@ -173,23 +181,20 @@ if __name__ == '__main__':
     else:
         # train the autoencoder
         vae.fit(data,
-                epochs=5,
-                batch_size=32)
-        vae.save_weights('vae_cnn_beamrider_5_m.h5')
+                epochs=args.epochs,
+                batch_size=args.batch_size)
+        vae.save_weights(args.save)
     
-    frame = np.expand_dims(data[5000], axis=0)
+    frame = np.expand_dims(data[600], axis=0)
     z_mean, _ , _ = encoder.predict(frame)
     
-    for i in range(32):
+    for latent_num in range(32):
         temp = z_mean
-        activ_offsets = np.linspace(-2.5, 2.5, 11)
-        latent_w_offsets = []
-        for j in activ_offsets:
-            temp[0, i] = z_mean[0, i] + j
-            latent_w_offsets.append(decoder.predict(temp)[0] * 255.0)
+        offsets = np.linspace(-2.5, 2.5, 11)
+        offset_recons = []
+        for offset in offsets:
+            temp[0, latent_num] = z_mean[0, latent_num] + offset
+            offset_recons.append(decoder.predict(temp)[0] * 255.0)
             temp = z_mean
-        latent_all_offsets = np.hstack(latent_w_offsets)
-        cv2.imwrite('mse_latent_{}.png'.format(i), latent_all_offsets)
-    
-    
-    import pdb; pdb.set_trace()
+        offset_recons_cat = np.hstack(offset_recons)
+        cv2.imwrite('mse_latent_{}.png'.format(latent_num), offset_recons_cat)
